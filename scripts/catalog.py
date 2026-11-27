@@ -66,36 +66,6 @@ def native_entry(folder):
     return {key: obj[key] for key in ("name", "displayName", "version", "description")} | {"source": "./" + prefix}
 
 
-def check_reviews():
-    obj = load_json(ROOT / "external.json", 2_000_000)
-    require(isinstance(obj, dict) and set(obj) == {"format", "plugins"} and type(obj["format"]) is int and
-            obj["format"] == 1 and isinstance(obj["plugins"], list), "external.json: invalid format")
-    seen = set()
-    for row in obj["plugins"]:
-        fields = {"market", "repository", "directory", "name", "revision", "description", "chinese", "requirements", "verified"}
-        require(isinstance(row, dict) and fields <= row.keys() <= fields | {"version"}, "external.json: invalid fields")
-        require(row["market"] in ("zcode", "claude", "openai", "community"), "external.json: unknown market")
-        require(text(row["name"]) and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}", row["name"]), "invalid external name")
-        require(text(row["repository"]) and re.fullmatch(r"[\w.-]+/[\w.-]+", row["repository"], re.ASCII) and
-                not {".", ".."}.intersection(row["repository"].split("/")), "invalid GitHub repository")
-        directory = row["directory"]
-        require(isinstance(directory, str) and (not directory or all(
-            part not in ("", ".", "..") and re.fullmatch(r"[\w.-]+", part) for part in directory.split("/"))),
-            "invalid upstream directory")
-        require(text(row["revision"]) and re.fullmatch("[a-f0-9]{40}", row["revision"]), "use an immutable Git commit")
-        require(text(row["description"]) and text(row["chinese"]) and ("version" not in row or text(row["version"])),
-                "provide plugin descriptions and a nonempty version when supplied")
-        require(isinstance(row["requirements"], list) and all(text(x) for x in row["requirements"]), "invalid prerequisites")
-        proof = row["verified"]
-        require(isinstance(proof, dict) and set(proof) == {"client", "steps", "result"} and text(proof["client"]) and
-                isinstance(proof["steps"], list) and len(proof["steps"]) >= 2 and all(text(x) for x in proof["steps"]) and
-                text(proof["result"]), "record the Stodex client, concrete test steps and result")
-        key = row["market"], row["name"]
-        require(key not in seen, f"duplicate external listing: {key}")
-        seen.add(key)
-    return len(seen)
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("check", "build"))
@@ -107,12 +77,11 @@ def main():
         if parent.exists():
             entries.extend(native_entry(item) for item in sorted(parent.iterdir()))
     require(len(entries) == len({x["name"] for x in entries}), "plugin IDs must be unique across both directories")
-    reviews = check_reviews()
     index = {"name": "stodex-plugins", "owner": {"name": "tsttkx", "url": "https://github.com/tsttkx"},
              "description": "Stodex 官方和社区插件", "plugins": entries}
     if args.action == "build":
         (ROOT / "marketplace.json").write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-    print(f"{len(entries)} Stodex plugins, {reviews} reviewed external plugins")
+    print(f"{len(entries)} Stodex plugins")
 
 
 if __name__ == "__main__":

@@ -11,6 +11,5 @@
 ## 市场清单
 
 - [marketplace.json](marketplace.json) 是自动生成的 Stodex 原生插件索引。
-- [external.json](external.json) 记录外部市场中已在 Stodex 验收的具体版本。每条记录包含上游仓库、提交、使用条件和验收结果。上游发布新版后，需要重新验收才能更新记录。
 
 校验使用 Python 3.10 或更新版本。在仓库根目录运行 `python scripts/catalog.py check`。
