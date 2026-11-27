@@ -5,5 +5,14 @@
     "url": "https://github.com/tsttkx"
   },
   "description": "Stodex 官方和社区插件",
-  "plugins": []
+  "plugins": [
+    {
+      "name": "video-agent-kit",
+      "displayName": "Video Agent Kit",
+      "version": "1.0.0",
+      "description": "在 Stodex 中理解、剪辑和创作视频，生成字幕、配音和赛事解说，也可从录屏还原网页与游戏。",
+      "source": "./plugins/video-agent-kit",
+      "icon": "./plugins/video-agent-kit/icon.png"
+    }
+  ]
 }

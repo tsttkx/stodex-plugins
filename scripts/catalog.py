@@ -1,6 +1,7 @@
 """Build the Stodex catalog from declarative submissions without loading plugin code."""
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -39,14 +40,34 @@ def native_entry(folder):
     prefix = folder.relative_to(ROOT).as_posix()
     require(folder.is_dir() and not folder.is_symlink(), f"{prefix}: expected a plugin directory")
     require(IDENTIFIER.fullmatch(folder.name) and len(folder.name) <= 64, f"{prefix}: invalid plugin identifier")
-    for item in folder.iterdir():
-        require(item.is_file() and not item.is_symlink() and
-                (item.name == "plugin.json" or re.fullmatch(r"README(?:\.[\w-]+)?\.md|LICENSE(?:\.\w+)?", item.name, re.I)),
-                f"{prefix}/{item.name}: unsupported package file")
     obj = load_json(folder / "plugin.json", 300_000)
-    require(isinstance(obj, dict) and set(obj) == {"format", "name", "displayName", "version", "description", "resources"},
-            f"{prefix}: unexpected or missing manifest fields")
-    require(obj["format"] == "stodex-plugin-v1" and obj["name"] == folder.name, f"{prefix}: invalid format or name")
+    require(isinstance(obj, dict) and obj.get("name") == folder.name, f"{prefix}: invalid manifest name")
+    native = obj.get("format") == "stodex-plugin-v2"
+    fields = {"format", "name", "displayName", "version", "description", "resources"}
+    if native:
+        require(folder.parent == ROOT / "plugins", f"{prefix}: executable bundles belong in the official directory")
+        fields.update(("servers", "files"))
+        assets = obj.get("files")
+        servers = obj.get("servers")
+        require(isinstance(assets, dict) and 0 < len(assets) <= 32, "declare the Python modules and checksums")
+        require(isinstance(servers, dict) and 0 < len(servers) <= 8, "declare the local MCP servers")
+        require(all(IDENTIFIER.fullmatch(name) and len(name) <= 24 and file in assets for name, file in servers.items()), "invalid server entrypoint")
+        require(not (folder / "mcp").is_symlink() and (folder / "mcp").is_dir(), "missing MCP directory")
+        for name, checksum in assets.items():
+            require(re.fullmatch(r"mcp/[a-z][a-z0-9_]{0,63}\.py", name), "invalid module path")
+            file = folder / name
+            require(not file.is_symlink() and file.is_file() and file.stat().st_size <= 1_000_000, f"invalid module: {name}")
+            require(hashlib.sha256(file.read_bytes()).hexdigest() == checksum, f"checksum mismatch: {name}")
+        require(set(assets) == {f"mcp/{x.name}" for x in (folder / "mcp").iterdir()}, "undeclared MCP file")
+    require(set(obj) == fields and (native or obj["format"] == "stodex-plugin-v1"), f"{prefix}: invalid format or fields")
+    for item in folder.iterdir():
+        if native and item.name == "mcp":
+            continue
+        require(item.is_file() and not item.is_symlink() and (item.name in ("plugin.json", "icon.png") or
+                re.fullmatch(r"README(?:\.[\w-]+)?\.md|LICENSE(?:\.\w+)?", item.name, re.I)), f"{prefix}/{item.name}: unsupported file")
+    icon = folder / "icon.png"
+    if icon.exists():
+        require(icon.stat().st_size <= 200_000 and icon.read_bytes()[:8] == bytes.fromhex("89504e470d0a1a0a"), "invalid icon")
     require(text(obj["displayName"]) and text(obj["description"]), f"{prefix}: provide a name and description")
     require(text(obj["version"]) and VERSION.fullmatch(obj["version"]), f"{prefix}: use a semantic version")
     rows = obj["resources"]
@@ -60,10 +81,11 @@ def native_entry(folder):
         require(text(name) and len(name.encode("utf-16-le")) // 2 <= 64 and
                 all(part and part.isalnum() for part in re.split("[-_]", name)),
                 f"{prefix}: invalid resource name")
-        require(name.lower() not in names, f"{prefix}: duplicate resource {name}")
-        names.add(name.lower())
+        key = (row["kind"], name.lower()) if native else name.lower()
+        require(key not in names, f"{prefix}: duplicate resource {name}")
+        names.add(key)
         require(text(row["description"]) and text(row["content"]), f"{prefix}: empty instructions for {name}")
-    return {key: obj[key] for key in ("name", "displayName", "version", "description")} | {"source": "./" + prefix}
+    return {key: obj[key] for key in ("name", "displayName", "version", "description")} | {"source": "./" + prefix} | ({"icon": "./" + prefix + "/icon.png"} if icon.exists() else {})
 
 
 def main():

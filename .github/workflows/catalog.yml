@@ -15,6 +15,8 @@ jobs:
       - run: python3 scripts/catalog.py check
       - run: python3 scripts/catalog.py build
       - run: git diff --check
+      - run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg espeak-ng
+      - run: python3 -B scripts/test_video_agent_kit.py
   publish:
     if: github.event_name == 'push'
     needs: check

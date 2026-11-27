@@ -1,0 +1,158 @@
+{
+  "format": "stodex-plugin-v2",
+  "name": "video-agent-kit",
+  "displayName": "Video Agent Kit",
+  "version": "1.0.0",
+  "description": "在 Stodex 中理解、剪辑和创作视频，生成字幕、配音和赛事解说，也可从录屏还原网页与游戏。",
+  "resources": [
+    {
+      "kind": "skill",
+      "name": "video-agent",
+      "description": "为视频理解、剪辑、创作和录屏复刻选择工作流，交付可打开的文件。",
+      "content": "先明确输入文件、目标成品和时长。第一次在该项目中运行 {{server:runtime}}_check_environment，再用 {{server:video-edit}}_probe_media 登记每个实际输入的流、尺寸和时长。能由本地媒体工具完成的步骤直接执行。需要观察画面时调用 extract_frames，从工具返回的图片取证。理解、剪辑、配音、多段组装、内容创作和录屏复刻分别选用本插件的对应技能。生成成品时使用新的文件名。完成后再次探测输出，检查头尾、关键转场和音轨；回复可点击的本地路径、成品时长和任何实际缺项。模型生成任务只提交一次，保存任务 ID 以供查询。"
+    },
+    {
+      "kind": "skill",
+      "name": "setup-guide",
+      "description": "检查本机视频环境，定位 FFmpeg、语音引擎和模型配置。",
+      "content": "调用 {{server:runtime}}_check_environment。can_edit 为真时直接处理任务。若缺少工具，告诉用户缺少的是 FFmpeg 还是 ffprobe；Windows 可使用 FFmpeg 下载页列出的完整构建，把两个程序所在目录加到 PATH 或在返回的 tool_settings JSON 中设置 ffmpeg_dir。Python 需 3.10 及以上。离线配音使用系统音色；离线识别可在实际运行插件的 Python 环境安装 faster-whisper，或配置 whisper_cli 与 whisper_models。视频生成、转写和配音的服务地址由「设置 → 视频与音频模型」分别指定。只有任务需要时才安装对应依赖或下载模型。重新运行环境检查，最后使用一个真实媒体文件验证。"
+    },
+    {
+      "kind": "skill",
+      "name": "video-edit-agent",
+      "description": "剪切、静音、缩放、压缩视频，检查口播停顿并按确认区间精简。",
+      "content": "对源文件运行 {{server:video-edit}}_probe_media，确认目标区间存在以及是否有音轨。单个片段使用 {{server:video-edit}}_edit_clip；start 和 end 都是相对于原片的秒数，end 不是持续时长。需要移除中间内容时把保留区间按顺序交给 {{server:video-edit}}_assemble。口播精简先运行 {{server:video-edit}}_detect_pauses，结合转写核对每个候选切点，保留必要的呼吸和停顿。先抽看接缝前后，再交付新的 MP4、实测时长和所用区间。"
+    },
+    {
+      "kind": "skill",
+      "name": "video-edit-assembly",
+      "description": "将独立素材、静帧和音轨组装成连续时间线。",
+      "content": "先记录每个文件的时长、画幅、帧率、声音和在故事中的作用。去重时对照文件摘要及实际抽帧，不能仅凭文件名。制作包含 source/start/end 的镜头表，静帧使用 seconds。用 {{server:video-edit}}_assemble 统一画幅和帧率；有声音的片段保留原声，静音片段也应占据正确时长。另配声音时用 {{server:video-edit}}_dub，按需混入原声。把成品时间线和源时间段一起交付，并检查接缝、字幕安全区与音画同步。"
+    },
+    {
+      "kind": "skill",
+      "name": "video-understanding",
+      "description": "按时间戳理解画面、检索片段、复核可见细节与外部来源。",
+      "content": "先运行 {{server:video-edit}}_probe_media，再用 {{server:video-edit}}_extract_frames 对开头、中段和结尾取样。涉及细小文字、运动或身份时，在候选时点前后加密取样并保留时码。语音可用 {{server:video-edit}}_transcribe，按词检索返回的时间片并回看原画。对“画面可见”“音频说到”和“查到的外部事实”分别给依据。用户要求溯源时使用 Stodex 已启用的浏览能力核对发布主体和原始时间，附出处。单帧无法确认的事件要给出所缺证据。"
+    },
+    {
+      "kind": "skill",
+      "name": "video-speech-workflows",
+      "description": "生成配音、带时码的字幕，并修正断句及同步偏差。",
+      "content": "用 {{server:video-edit}}_transcribe 获取文字与识别器实际返回的 segments。逐段核对称呼、专名和数字，将行断在语义停顿处。用 {{server:video-edit}}_write_subtitles 写 UTF-8 SRT，再用 {{server:video-edit}}_burn_subtitles 出片。若 API 只返回全文且没有分段，保留全文并使用支持时间戳的识别器，或用可靠的人工时间码。配音先根据镜头时长分句，用 {{server:video-edit}}_narrate 合成 WAV，核实时长后用 {{server:video-edit}}_dub 混入。合成太长须缩短文本或调整剪辑，不能把被截断的句尾标成完成。"
+    },
+    {
+      "kind": "skill",
+      "name": "video-recap-workflows",
+      "description": "制作电影、足球、篮球和英雄联盟比赛的带证据解说。",
+      "content": "为长素材建立事件表，记录原片开始和结束时间、画面变化、旁白依据与目标剪辑时长。电影按人物、冲突和结果组织；足球/篮球按记分牌、比赛时钟和回放去重；英雄联盟按游戏时间、击杀播报与目标物状态交叉检查。同一事件的直播和回放分别标记。可请 {{plugin}}:recap-observer 核对事件，再请 {{plugin}}:recap-text-reviewer 核对解说稿。用 {{server:video-edit}}_assemble、narrate 和 dub 制作成品。请 {{plugin}}:recap-final-reviewer 复核时长、比分和旁白同步，再交付事件表和视频。"
+    },
+    {
+      "kind": "skill",
+      "name": "video-creation",
+      "description": "根据简报、脚本和素材制作单集或保持连续性的系列视频。",
+      "content": "确定镜头清单、画幅、每段时长和交付方式。系列作品先建立人物、场景、声音、色彩和前情的连续性表。优先使用用户提供或明确许可的素材；已有照片可直接用 {{server:video-edit}}_assemble 制作分镜成片。需要模型生成镜头时调用 {{server:video-edit}}_generate_video 并保存返回的 job 和 mode，然后用 video_result 查询和下载，避免重复计费。输入已知图像/蒙版的换人可交给 video-swap。匹配节奏后用 narrate、dub、burn_subtitles，最后让 {{plugin}}:creation-verifier 查看实际输出文件与抽帧。"
+    },
+    {
+      "kind": "skill",
+      "name": "code2video",
+      "description": "把可运行的 2D 或 3D 动画渲染成视频。",
+      "content": "先写可运行的动画源文件并定义固定的尺寸、时长、帧率和随时间变化的状态。2D 可以用 Pillow/Canvas，3D 可以用已安装的 Blender 或 WebGL。将同一时间函数按 frame_index / fps 逐帧渲染为 000001.png 等六位连续文件；每帧同尺寸，以相同随机种子保持可复现。浏览器动画也可用浏览器现有录制能力导出后再剪辑。用 {{server:video-edit}}_render_frames 编码成片，按实际镜头变化用 extract_frames 抽查首中末帧。3D 运动请 {{plugin}}:c2v-3d-reviewer 检查遮挡、裁切和相机，2D 交给 {{plugin}}:c2v-reviewer。交付视频及可再次渲染的源码。"
+    },
+    {
+      "kind": "skill",
+      "name": "video-swap",
+      "description": "用人物遮罩和对齐的替换素材合成整段视频，或使用本机视频生成工作流。",
+      "content": "先核对输入、目标人物、授权的替换素材和遮罩。对于已对齐的完整尺寸图层，{{server:video-edit}}_replace_subject 使用逐帧黑白遮罩，白处采用替换素材，黑处保留原画；支持静态和动态遮罩。画面有运动时先取得跟踪或分割遮罩，检查脚部、头发、遮挡和运动边缘。需要从单张参考图生成连续人物时，使用已在本机配置并支持人物替换的 ComfyUI API 工作流，先放好原片、参考图和蒙版并确认工作流的输出节点，再用 generate_video 和 video_result 获取视频。单点 API 的文本生成功能不能代替具有人物输入的工作流。抽查快速动作和遮挡时刻，并核实声音轨道。"
+    },
+    {
+      "kind": "skill",
+      "name": "video2code",
+      "description": "从录屏还原网页的可见布局、状态与交互。",
+      "content": "利用 {{server:video-edit}}_extract_frames 获取录屏中的初始布局、点击前后、弹窗、滚动位置与表单状态。建立“时码、输入、状态前后、可见反馈”表。使用 Stodex 的文件编辑和运行能力实现可操作的页面，按用户提供的工程技术栈组织文件。把静态构建目录交给 {{server:runtime}}_preview_site，使用 Stodex 的浏览器实点路径，按原时码对比。对看不到的后台逻辑记录假设。供 {{plugin}}:v2c-verifier 核验后交付源码、启动方法及已验证交互。"
+    },
+    {
+      "kind": "skill",
+      "name": "video2fullstack",
+      "description": "从操作录屏还原带持久化与服务端接口的可运行应用。",
+      "content": "用 {{server:video-edit}}_extract_frames 对照导航、输入、请求等待、成功、错误及重新加载后的状态。先列出可见业务实体、状态转移与保存行为，明确录屏无法证明的细节。按工作区技术栈实现页面、API 与持久化，提供初始数据和一条可重复的本地启动命令。写入一条数据再刷新、重新启动服务并读回；用实际 HTTP 响应和 UI 复核。仅静态前端构建可用 {{server:runtime}}_preview_site，动态 API 使用工程自己的服务。不要代替用户接入真实账户。"
+    },
+    {
+      "kind": "skill",
+      "name": "video2game",
+      "description": "从游戏录屏还原可操作的核心规则、输入、碰撞与反馈。",
+      "content": "对开始、输入、状态改变、计分、失败、重开和 HUD 变化逐个抽帧。区分画面事实与推定的物理参数。使用 Stodex 编辑项目，先打通一条可玩循环，再按录屏调整速度、碰撞和反馈。用固定随机种子或可重复输入测试，确认分数变化、失败和重开。将静态成品交给 {{server:runtime}}_preview_site，在浏览器实际操作，并对照记录的时码。交付能玩的一局及源码。"
+    },
+    {
+      "kind": "skill",
+      "name": "web-replicate",
+      "description": "构建并在本机预览录屏复刻的站点，逐项检查浏览器交互。",
+      "content": "沿用当前项目的组件、字体和工具链，从录屏关键帧标注可见区域、间距、文本层次和响应式断点。运行工程自己的构建脚本，将只含静态产物的目录交给 {{server:runtime}}_preview_site。用 Stodex 浏览器访问返回的回环地址，检查静态资源、字体、表单、键盘焦点、前进后退以及窄屏布局。需要 API 的功能使用真实本地服务。修改后刷新同一地址并比较相同时刻的画面。可通过 stop_preview 结束预览。"
+    },
+    {
+      "kind": "prompt",
+      "name": "setup-guide",
+      "description": "检查本机的视频、音频和预览环境。",
+      "content": "加载 {{plugin}}:setup-guide，调用 {{server:runtime}}_check_environment，报告实际可运行的能力。用户的补充要求为 $ARGUMENTS。"
+    },
+    {
+      "kind": "prompt",
+      "name": "video-edit",
+      "description": "处理视频理解、编辑、创作或录屏复刻任务。",
+      "content": "加载 {{plugin}}:video-agent。任务为 $ARGUMENTS。根据真实输入选择相应的技能和 MCP 工具，产出并验证用户要求的文件。"
+    },
+    {
+      "kind": "agent",
+      "name": "c2v-3d-reviewer",
+      "description": "从取样帧核验 3D 动画的运镜、空间关系和遮挡。",
+      "content": "取得成片路径、预期动作和目标时码。使用 {{server:video-edit}}_extract_frames 对比运动前后及相机转场。检查裁切、物体穿插、相机轴向、投影与材质变化。问题逐条注明时码和复现条件。无法从取样确认的物理细节单独说明。"
+    },
+    {
+      "kind": "agent",
+      "name": "c2v-reviewer",
+      "description": "逐镜审查 2D 动画的节奏、文字可读性和最终编码。",
+      "content": "结合脚本、实际时长和抽帧检查主体是否在画面内、文字是否溢出、关键动作是否有足够停留。使用 probe_media 校验分辨率与帧率。给出最小修订位置和复检时间点。"
+    },
+    {
+      "kind": "agent",
+      "name": "creation-verifier",
+      "description": "验证单集或连续剧的镜头完整性、素材和声音连续性。",
+      "content": "比较分镜表与成片，按时码记录丢失镜头、重复镜头、声音缺口和跨集人物/场景不一致。实际读媒体元数据并抽帧。返回已符合的交付条件和仍需修复的具体时间段。"
+    },
+    {
+      "kind": "agent",
+      "name": "recap-final-reviewer",
+      "description": "核对解说成片的画面、旁白、字幕与赛事事件。",
+      "content": "按成片时间回到原片，核对每一项比分、胜负、人物与解说依据，检查旁白先后、音量遮蔽和字幕截断。对直播与重复回放进行区分。将每个问题关联原片与成片的两组时间戳。"
+    },
+    {
+      "kind": "agent",
+      "name": "recap-observer",
+      "description": "观看电影或赛事原片，建立可追溯的事件表。",
+      "content": "用实际抽帧、语音片段及记分牌观察，给出原片开始秒、结束秒、画面证据、人物/队伍与置信范围。不能凭一帧推断进球或团战结果，回看紧随其后的画面。"
+    },
+    {
+      "kind": "agent",
+      "name": "recap-text-reviewer",
+      "description": "逐句核实解说内容、事实顺序和可用旁白时长。",
+      "content": "将每句旁白映射到事件表和出处。标出片外知识、未证实身份、比分与叙事顺序错误。估算或合成后测量配音时长，提出能在相应区段自然念完的替换句。"
+    },
+    {
+      "kind": "agent",
+      "name": "v2c-verifier",
+      "description": "对照录屏验证网页或游戏的可运行交互。",
+      "content": "从录屏整理最短可复现的操作序列，在本地预览逐项执行并记录可见结果。比较弹窗、键盘和焦点、反馈、状态保存以及游戏规则。报告源码入口、本地预览地址及每个差异对应的时码。"
+    }
+  ],
+  "servers": {
+    "video-edit": "mcp/video_edit.py",
+    "runtime": "mcp/runtime.py"
+  },
+  "files": {
+    "mcp/media.py": "2f1c74598d780677e8a905c84a39680c5c4ba99ddd098b760ee3adb2edc2f9d6",
+    "mcp/models.py": "d6b45f9083071e7e291859b60b3c75025622b7c9d34d06407acf2e6d720172d4",
+    "mcp/protocol.py": "f74eed74fd2d71113cde6b208b89dcd8a25959387af246d3684ec1fb4f3ac888",
+    "mcp/runtime.py": "299d6855c515bdf02d1860ba53da2f2cb9704afa66f20dbe1cd3c5f588b029a2",
+    "mcp/video_edit.py": "c09fd56776609761998e9a5b6729bbd42a079bf41f3a69bc7e06dcac783c5733"
+  }
+}
