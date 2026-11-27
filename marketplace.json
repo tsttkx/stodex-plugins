@@ -1,0 +1,9 @@
+{
+  "name": "stodex-plugins",
+  "owner": {
+    "name": "tsttkx",
+    "url": "https://github.com/tsttkx"
+  },
+  "description": "Stodex 官方和社区插件",
+  "plugins": []
+}
