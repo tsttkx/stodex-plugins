@@ -80,7 +80,7 @@ def serve(server):
                 versions = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
                 version = params.get("protocolVersion")
                 data = {"protocolVersion": version if version in versions else versions[0], "capabilities": {"tools": {}},
-                        "serverInfo": {"name": server, "version": "1.0.0"}}
+                        "serverInfo": {"name": server, "version": "1.1.0"}}
             elif event == "ping":
                 data = {}
             elif event == "tools/list":

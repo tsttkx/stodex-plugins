@@ -12,7 +12,7 @@ from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import build_opener, HTTPRedirectHandler, Request
 
 from media import AUDIO, VIDEO, config, ff, output, probe, rendered, run, source
-from protocol import choice, fields, INTEGER, POSITIVE, STRING, tool
+from protocol import choice, fields, STRING, tool
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -143,37 +143,7 @@ def narrate(text, output_path, voice=None):
     return rendered(output_path)
 
 
-@tool("Submit one video-generation job to the configured API or a local ComfyUI workflow. Returns a job ID to poll using video_result. For local ComfyUI provide an API-format workflow with a {{prompt}} value and a video-save node.", fields(
-      {"prompt": STRING, "workflow": STRING, "seconds": choice("4","8","12"), "size": choice("720x1280","1280x720","1024x1792","1792x1024")}, ["prompt"]))
-def generate_video(prompt, workflow=None, seconds="4", size="1280x720"):
-    settings = profile("video")
-    if settings["mode"] == "api":
-        body, mime = multipart({"model": settings["model"], "prompt": prompt, "seconds": seconds, "size": size})
-        data = request(settings, "/videos", body=body, mime=mime)
-        if not isinstance(data.get("id"), str):
-            raise ValueError("Video service returned no job ID")
-        return {"job": data["id"], "status": data.get("status", "queued"), "mode": "api"}
-    if not workflow:
-        raise ValueError("Select a local ComfyUI API workflow with a video-save node, or configure a /videos API in Stodex.")
-    file = source(workflow, {".json"})
-    graph = json.loads(file.read_text(encoding="utf-8-sig"))
-    if not isinstance(graph, dict) or not graph or not all(isinstance(node, dict) and "class_type" in node for node in graph.values()):
-        raise ValueError("Export the workflow in ComfyUI API format")
-    changed = False
-    for node in graph.values():
-        for key, value in node.get("inputs", {}).items():
-            if isinstance(value, str) and "{{prompt}}" in value:
-                node["inputs"][key] = value.replace("{{prompt}}", prompt)
-                changed = True
-    if not changed:
-        raise ValueError("The workflow must declare a {{prompt}} placeholder")
-    data = request(settings, "/prompt", body={"prompt": graph, "client_id": uuid.uuid4().hex})
-    if not data.get("prompt_id"):
-        raise ValueError("ComfyUI rejected the selected workflow")
-    return {"job": data["prompt_id"], "status": "queued", "mode": "local"}
-
-
-@tool("Check an existing generation job. Supply a fresh .mp4 path to download the finished video. Never resubmits the job.", fields(
+@tool("Recover a legacy Video Agent Kit 1.0 video job using its original job and mode. For jobs from Stodex model settings, use call_model with action=video_status and the original model and job.", fields(
       {"job": STRING, "mode": choice("api","local"), "output_path": STRING}, ["job", "mode"]))
 def video_result(job, mode, output_path=None):
     if not re.fullmatch(r"[\w-]{1,160}", job):

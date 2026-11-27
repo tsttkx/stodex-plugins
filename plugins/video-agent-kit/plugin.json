@@ -2,20 +2,20 @@
   "format": "stodex-plugin-v2",
   "name": "video-agent-kit",
   "displayName": "Video Agent Kit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "在 Stodex 中理解、剪辑和创作视频，生成字幕、配音和赛事解说，也可从录屏还原网页与游戏。",
   "resources": [
     {
       "kind": "skill",
       "name": "video-agent",
       "description": "为视频理解、剪辑、创作和录屏复刻选择工作流，交付可打开的文件。",
-      "content": "先明确输入文件、目标成品和时长。第一次在该项目中运行 {{server:runtime}}_check_environment，再用 {{server:video-edit}}_probe_media 登记每个实际输入的流、尺寸和时长。能由本地媒体工具完成的步骤直接执行。需要观察画面时调用 extract_frames，从工具返回的图片取证。理解、剪辑、配音、多段组装、内容创作和录屏复刻分别选用本插件的对应技能。生成成品时使用新的文件名。完成后再次探测输出，检查头尾、关键转场和音轨；回复可点击的本地路径、成品时长和任何实际缺项。模型生成任务只提交一次，保存任务 ID 以供查询。"
+      "content": "先明确输入文件、目标成品和时长。第一次在该项目中运行 {{server:runtime}}_check_environment，再用 {{server:video-edit}}_probe_media 登记每个实际输入的流、尺寸和时长。能由本地媒体工具完成的步骤直接执行。需要观察画面时调用 extract_frames，从工具返回的图片取证。理解、剪辑、配音、多段组装、内容创作和录屏复刻分别选用本插件的对应技能。用户要求生成镜头时加载 {{plugin}}:video-creation，通过 Stodex 的 call_model 调用模型设置中已启用的视频生成模型。生成成品时使用新的文件名。完成后再次探测输出，检查头尾、关键转场和音轨；回复可点击的本地路径、成品时长和任何实际缺项。模型生成任务只提交一次，保存每个镜头对应的完整模型引用和任务 ID，以供查询和续作。"
     },
     {
       "kind": "skill",
       "name": "setup-guide",
       "description": "检查本机视频环境，定位 FFmpeg、语音引擎和模型配置。",
-      "content": "调用 {{server:runtime}}_check_environment。can_edit 为真时直接处理任务。若缺少工具，告诉用户缺少的是 FFmpeg 还是 ffprobe；Windows 可使用 FFmpeg 下载页列出的完整构建，把两个程序所在目录加到 PATH 或在返回的 tool_settings JSON 中设置 ffmpeg_dir。Python 需 3.10 及以上。离线配音使用系统音色；离线识别可在实际运行插件的 Python 环境安装 faster-whisper，或配置 whisper_cli 与 whisper_models。视频生成、转写和配音的服务地址由「设置 → 视频与音频模型」分别指定。只有任务需要时才安装对应依赖或下载模型。重新运行环境检查，最后使用一个真实媒体文件验证。"
+      "content": "调用 {{server:runtime}}_check_environment。can_edit 表示可以使用本地媒体剪辑工具。需要生成镜头时调用 Stodex 的 call_model，使用 action=list、query=video，从返回结果中核对 task=video 的模型。若缺少工具，告诉用户缺少的是 FFmpeg 还是 ffprobe；Windows 可使用 FFmpeg 下载页列出的完整构建，把两个程序所在目录加到 PATH 或在返回的 tool_settings JSON 中设置 ffmpeg_dir。Python 需 3.10 及以上。离线配音使用系统音色；离线识别可在实际运行插件的 Python 环境安装 faster-whisper，或配置 whisper_cli 与 whisper_models。若缺少启用的视频生成模型，提示用户前往「设置 → 模型设置」为目标模型选择「会话调用用途 → 视频生成」。转写与配音继续使用 Stodex 已配置的音频服务。只有任务需要时才安装对应依赖或下载模型。重新运行环境检查，最后使用一个真实媒体文件验证。"
     },
     {
       "kind": "skill",
@@ -51,7 +51,7 @@
       "kind": "skill",
       "name": "video-creation",
       "description": "根据简报、脚本和素材制作单集或保持连续性的系列视频。",
-      "content": "确定镜头清单、画幅、每段时长和交付方式。系列作品先建立人物、场景、声音、色彩和前情的连续性表。优先使用用户提供或明确许可的素材；已有照片可直接用 {{server:video-edit}}_assemble 制作分镜成片。需要模型生成镜头时调用 {{server:video-edit}}_generate_video 并保存返回的 job 和 mode，然后用 video_result 查询和下载，避免重复计费。输入已知图像/蒙版的换人可交给 video-swap。匹配节奏后用 narrate、dub、burn_subtitles，最后让 {{plugin}}:creation-verifier 查看实际输出文件与抽帧。"
+      "content": "确定镜头清单、画幅、每段时长和交付方式。系列作品先建立人物、场景、声音、色彩和前情的连续性表。优先使用用户提供或明确许可的素材；已有照片可直接用 {{server:video-edit}}_assemble 制作分镜成片。需要生成镜头时，先调用 Stodex 的 call_model（action=list，query=video），筛选 task 为 video 的候选。使用用户或工作流明确指定的模型；仅有一个可用模型时直接用它。多个模型且没有指定时列出候选让用户选择。没有可用模型时提示在模型设置中启用视频生成模型。用户指定的模型不可用时报告该镜头受阻。每个新镜头调用一次 call_model（action=video，model 填清单返回的完整供应商/模型引用，prompt 填该镜头描述）；任务指明且服务支持时传 seconds 和 size。按镜头保存实际 model 和 job。已有任务使用同一个 model 和 job 调用 call_model（action=video_status），提供新的 .mp4 文件路径 output_file 下载已完成的镜头。排队或生成中保留 job 继续查询，提交结果未知时先核对已有任务；完成下载后用 {{server:video-edit}}_probe_media 核实镜头尺寸和实际时长，再组装成片。输入已知图像/蒙版的换人可交给 video-swap。匹配节奏后用 narrate、dub、burn_subtitles，最后让 {{plugin}}:creation-verifier 查看实际输出文件与抽帧。"
     },
     {
       "kind": "skill",
@@ -62,8 +62,8 @@
     {
       "kind": "skill",
       "name": "video-swap",
-      "description": "用人物遮罩和对齐的替换素材合成整段视频，或使用本机视频生成工作流。",
-      "content": "先核对输入、目标人物、授权的替换素材和遮罩。对于已对齐的完整尺寸图层，{{server:video-edit}}_replace_subject 使用逐帧黑白遮罩，白处采用替换素材，黑处保留原画；支持静态和动态遮罩。画面有运动时先取得跟踪或分割遮罩，检查脚部、头发、遮挡和运动边缘。需要从单张参考图生成连续人物时，使用已在本机配置并支持人物替换的 ComfyUI API 工作流，先放好原片、参考图和蒙版并确认工作流的输出节点，再用 generate_video 和 video_result 获取视频。单点 API 的文本生成功能不能代替具有人物输入的工作流。抽查快速动作和遮挡时刻，并核实声音轨道。"
+      "description": "用人物遮罩和对齐的替换素材合成整段视频。",
+      "content": "先核对输入、目标人物、授权的替换素材和遮罩。对于已对齐的完整尺寸图层，{{server:video-edit}}_replace_subject 使用逐帧黑白遮罩，白处采用替换素材，黑处保留原画；支持静态和动态遮罩。画面有运动时先取得跟踪或分割遮罩，检查脚部、头发、遮挡和运动边缘。只有单张参考图时，先检查可用工具是否实际支持传入参考图、原片与遮罩。单纯文本生成无法保留源人物的运动；缺少对应能力时向用户说明所需的对齐素材。抽查快速动作和遮挡时刻，并核实声音轨道。"
     },
     {
       "kind": "skill",
@@ -99,7 +99,7 @@
       "kind": "prompt",
       "name": "video-edit",
       "description": "处理视频理解、编辑、创作或录屏复刻任务。",
-      "content": "加载 {{plugin}}:video-agent。任务为 $ARGUMENTS。根据真实输入选择相应的技能和 MCP 工具，产出并验证用户要求的文件。"
+      "content": "加载 {{plugin}}:video-agent。任务为 $ARGUMENTS。生成镜头时加载 {{plugin}}:video-creation，用 Stodex 的 call_model 调用模型设置中已启用的视频模型；剪辑时按素材选择本插件的媒体工具，产出并验证用户要求的文件。"
     },
     {
       "kind": "agent",
@@ -150,9 +150,9 @@
   },
   "files": {
     "mcp/media.py": "2f1c74598d780677e8a905c84a39680c5c4ba99ddd098b760ee3adb2edc2f9d6",
-    "mcp/models.py": "d6b45f9083071e7e291859b60b3c75025622b7c9d34d06407acf2e6d720172d4",
-    "mcp/protocol.py": "f74eed74fd2d71113cde6b208b89dcd8a25959387af246d3684ec1fb4f3ac888",
-    "mcp/runtime.py": "299d6855c515bdf02d1860ba53da2f2cb9704afa66f20dbe1cd3c5f588b029a2",
-    "mcp/video_edit.py": "c09fd56776609761998e9a5b6729bbd42a079bf41f3a69bc7e06dcac783c5733"
+    "mcp/models.py": "d0d754dc9596794abfa79f2ce54edb49df862a96296132b30d3ef823164876f3",
+    "mcp/protocol.py": "76261e6e45aaec07ace457ee605c4ed5f4cba7b76fac07c9a1d2cb328ae7dad5",
+    "mcp/runtime.py": "593bed74e748d7003fb35dfed64c03a47c872927577f2469cefcca5ec5703d17",
+    "mcp/video_edit.py": "9e015423681c0732e9abb8ba33421ab35760d1a24f2d011c204bc4dce5117bfa"
   }
 }

@@ -186,7 +186,7 @@ def replace_subject(path, replacement, matte, output_path):
     return rendered(output_path)
 
 
-# Register the speech and video model adapters on the same editing service.
+# Register audio tools and the result reader for jobs submitted by older installations.
 import models
 
 if __name__ == "__main__":

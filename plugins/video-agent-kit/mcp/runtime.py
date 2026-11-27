@@ -19,7 +19,7 @@ from protocol import BOOL, STRING, fields, serve, tool
 previews = {}
 
 
-@tool("Check the actual local media tools, Python, speech backends and the three configured Stodex model modes. Does not generate media or disclose keys.", fields({}))
+@tool("Check local editing tools, Python and audio settings. List available video models through the Stodex call_model tool.", fields({}))
 def check_environment():
     import json
     local = config()
@@ -28,7 +28,8 @@ def check_environment():
     model_file = os.getenv("STODEX_MEDIA_MODELS")
     settings = json.loads(Path(model_file).read_text("utf-8")) if model_file and Path(model_file).is_file() else {}
     modes = {key: {"mode": settings.get(key, {}).get("mode", "local"), "model": settings.get(key, {}).get("model", "")}
-             for key in ("video", "speech", "transcription")}
+             for key in ("speech", "transcription")}
+    modes["video"] = {"source": "stodex_model_settings", "tool": "call_model", "action": "list", "query": "video"}
     return {"python": sys.version.split()[0], "platform": platform.system(), "workspace": str(Path.cwd()), "ffmpeg": ffmpeg,
             "ffprobe": ffprobe, "can_edit": bool(ffmpeg and ffprobe), "tool_settings": str(CONFIG),
             "local_asr": {"faster_whisper": importlib.util.find_spec("faster_whisper") is not None,

@@ -46,6 +46,9 @@ def main():
         with service(modules / "runtime.py", profile) as (runtime_tools, runtime), service(modules / "video_edit.py", profile) as (video_tools, video):
             env = runtime("check_environment")[0]
             assert env["can_edit"]
+            assert env["models"]["video"] == {"source": "stodex_model_settings", "tool": "call_model", "action": "list", "query": "video"}
+            names = {tool["name"] for tool in video_tools}
+            assert "generate_video" not in names and "video_result" in names
             (folder / "index.html").write_text("<h1>Stodex</h1>", encoding="utf-8")
             preview = runtime("preview_site", directory=temp)[0]
             with urlopen(preview["url"], timeout=5) as page:
